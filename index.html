@@ -141,7 +141,7 @@
                 legPivot.position.set(side * 0.5, 2.4, 0);
                 return legPivot;
             };
-            leftLeg = createLeg(1); rightLeg = createLeg(-1);
+            leftLeg = createLeg(-1); rightLeg = createLeg(1);
             player.add(leftLeg, rightLeg, torsoGroup);
 
             const jerseyNum = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1, 0.15), matBlue);
@@ -252,24 +252,22 @@
                     torsoGroup.position.y = THREE.MathUtils.lerp(torsoGroup.position.y, 2.7, 0.1);
                 }
 
-                // --- REALISTIC KICK MOTION (RIGHT LEG) ---
-                if(isKicking) {
-                    kickProgress += 0.08; // Control speed of animation
-                    
-                    if(kickProgress < 0.3) {
-                        // Phase 1: Snap leg forward (Kicking the ball)
-                        rightLeg.rotation.x = THREE.MathUtils.lerp(0, 1.8, kickProgress / 0.3);
-                        // Ensure the other leg stays planted
-                        leftLeg.rotation.x = 0;
-                    } else if(kickProgress < 1.0) {
-                        // Phase 2: Smooth follow-through and return
-                        rightLeg.rotation.x = THREE.MathUtils.lerp(1.8, 0, (kickProgress - 0.3) / 0.7);
-                    } else {
-                        isKicking = false;
-                        kickProgress = 0;
-                    }
-                }
-
+              // --- REALISTIC KICK MOTION (RIGHT LEG) ---
+if(isKicking) {
+    kickProgress += 0.08; 
+    
+    if(kickProgress < 0.3) {
+        // Swing the RIGHT leg FORWARD (Positive 1.8)
+        rightLeg.rotation.x = THREE.MathUtils.lerp(0, 1.8, kickProgress / 0.3);
+        leftLeg.rotation.x = 0; // Keep left leg on the ground
+    } else if(kickProgress < 1.0) {
+        // Return RIGHT leg to standing position
+        rightLeg.rotation.x = THREE.MathUtils.lerp(1.8, 0, (kickProgress - 0.3) / 0.7);
+    } else {
+        isKicking = false;
+        kickProgress = 0;
+    }
+}
                 player.position.copy(playerPos);
                 player.rotation.y = currentYaw;
                 camera.rotation.set(currentPitch, currentYaw, 0, 'YXZ');
