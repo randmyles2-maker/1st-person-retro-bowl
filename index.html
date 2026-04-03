@@ -258,10 +258,10 @@
                     
                     if(kickProgress < 0.3) {
                         // Phase 1: Snap leg forward (Kicking the ball)
-                        rightLeg.rotation.x = THREE.MathUtils.lerp(0, -1.8, kickProgress / 0.3);
+                        rightLeg.rotation.x = THREE.MathUtils.lerp(0, 1.8, kickProgress / 0.3);
                     } else if(kickProgress < 1.0) {
                         // Phase 2: Smooth follow-through and return
-                        rightLeg.rotation.x = THREE.MathUtils.lerp(-1.8, 0, (kickProgress - 0.3) / 0.7);
+                        rightLeg.rotation.x = THREE.MathUtils.lerp(1.8, 0, (kickProgress - 0.3) / 0.7);
                     } else {
                         isKicking = false;
                         kickProgress = 0;
