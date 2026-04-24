@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>football - Field Goal Edition</title>
+    <title>PRO FOOTBALL - Fixed Speed & Gear</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
     <style>
         :root { --nfl-orange: #fb4f14; --nfl-blue: #002244; }
@@ -14,41 +14,109 @@
         #menu { position: absolute; inset: 0; background: radial-gradient(circle, rgba(0,20,40,0.95), #000); display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; z-index: 100; text-align: center; }
         .btn { padding: 25px 100px; background: var(--nfl-orange); color: white; border: 2px solid white; font-size: 32px; cursor: pointer; font-weight: bold; text-transform: uppercase; border-radius: 4px; box-shadow: 0 10px 0 #8a2b0c; }
         .btn:active { transform: translateY(6px); box-shadow: 0 4px 0 #8a2b0c; }
+        #msg { position: absolute; top: 20%; width: 100%; text-align: center; color: var(--nfl-orange); font-size: 80px; display: none; pointer-events: none; text-shadow: 4px 4px 0 #000; z-index: 1000; }
     </style>
 </head>
 <body>
 
     <div id="ui"><div id="stats">SCORE: <span id="score" style="color:var(--nfl-orange)">0</span></div></div>
+    <div id="msg">TACKLED!</div>
 
     <div id="menu">
-        <h1 style="font-size: 90px; margin: 0; letter-spacing: -4px;">FOOTBALL</h1>
-        <button class="btn" id="start-btn">START</button>
-        <p style="margin-top:20px;"><b>KICK THROUGH THE UPRIGHTS</b> | Y to Kick | WASD to Move</p>
+        <h1 style="font-size: 90px; margin: 0; letter-spacing: -4px;">PRO FOOTBALL</h1>
+        <button class="btn" id="start-btn">START GAME</button>
+        <p style="margin-top:20px;"><b>WASD</b> Move | <b>SHIFT</b> Sprint | <b>Y</b> Kick | <b>CLICK</b> Throw | <b>U</b> Switch Cam</p>
     </div>
 
     <script>
         let scene, camera, renderer, player, ballInHand, is3rd = false;
-        let score = 0, gameActive = false, footballs = [], keys = {};
+        let score = 0, gameActive = false, footballs = [], npcs = [], keys = {};
         const playerPos = new THREE.Vector3(0, 0, 150);
         
         let targetYaw = 0, targetPitch = 0;
         let currentYaw = 0, currentPitch = 0;
         let shake = 0, walkCycle = 0;
-        
-        let isKicking = false;
-        let kickProgress = 0; 
+        let isKicking = false, kickProgress = 0;
 
         let leftLeg, rightLeg, leftArm, rightArm, torsoGroup;
 
-        function createGrassTexture(color1, color2) {
+        // --- DEFENDER CLASS ---
+        class Defender {
+            constructor(x, z) {
+                this.group = createFullCharacter(0xbb0000, 0x000044); 
+                this.pos = new THREE.Vector3(x, 0, z);
+                // NPCs are now significantly slower (0.35 - 0.45) vs Player (0.8 - 1.35)
+                this.speed = 0.35 + Math.random() * 0.1;
+                scene.add(this.group);
+            }
+            update(target) {
+                const dir = new THREE.Vector3().subVectors(target, this.pos).normalize();
+                this.pos.addScaledVector(dir, this.speed);
+                this.group.position.copy(this.pos);
+                this.group.lookAt(target.x, 0, target.z);
+                if (this.pos.distanceTo(target) < 4.8) resetPlay("TACKLED!");
+            }
+        }
+
+        function resetPlay(text) {
+            if(text) {
+                const el = document.getElementById('msg');
+                el.innerText = text; el.style.display = 'block';
+                setTimeout(() => el.style.display = 'none', 1200);
+            }
+            shake = 0.6;
+            playerPos.set(0, 0, 150);
+            npcs.forEach((n, i) => n.pos.set((Math.random() - 0.5) * 140, 0, -100 - (i * 90)));
+        }
+
+        // --- MODELS ---
+        function createFullCharacter(pCol, sCol) {
+            const group = new THREE.Group();
+            const matP = new THREE.MeshStandardMaterial({color: pCol});
+            const matS = new THREE.MeshStandardMaterial({color: sCol});
+            const matChrome = new THREE.MeshStandardMaterial({color: 0xcccccc, metalness: 0.8});
+
+            const torso = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 0.9, 2.2, 12), matP);
+            torso.position.y = 1.1; torso.scale.set(1.1, 1, 0.7);
+            group.add(torso);
+
+            // Helmet logic
+            const helm = new THREE.Mesh(new THREE.SphereGeometry(0.85, 16, 16), matP);
+            helm.position.y = 2.8;
+            const mask = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.05, 8, 16, Math.PI), matChrome);
+            mask.position.set(0, 2.5, -0.55);
+            group.add(helm, mask);
+
+            group.position.y = 2.4;
+            return group;
+        }
+
+        function createEliteBall() {
+            const ball = new THREE.Group();
+            const leather = new THREE.MeshStandardMaterial({ color: 0x4d2613, roughness: 0.7 });
+            const body = new THREE.Mesh(new THREE.SphereGeometry(0.55, 32, 32), leather);
+            body.scale.set(1, 0.8, 1.8);
+            
+            const ringMat = new THREE.MeshBasicMaterial({color: 0xffffff});
+            const r1 = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.04, 8, 32), ringMat);
+            r1.position.z = 0.6;
+            const r2 = r1.clone(); r2.position.z = -0.6;
+            
+            const laces = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.8), ringMat);
+            laces.position.set(0, 0.45, 0);
+            
+            ball.add(body, r1, r2, laces);
+            return ball;
+        }
+
+        function createGrassTexture(c1, c2) {
             const canvas = document.createElement('canvas');
             canvas.width = 512; canvas.height = 512;
             const ctx = canvas.getContext('2d');
-            ctx.fillStyle = color1;
-            ctx.fillRect(0, 0, 512, 512);
-            for (let i = 0; i < 20000; i++) {
-                ctx.fillStyle = Math.random() > 0.5 ? color2 : 'rgba(0,0,0,0.1)';
-                ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 4);
+            ctx.fillStyle = c1; ctx.fillRect(0, 0, 512, 512);
+            for (let i = 0; i < 15000; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? c2 : 'rgba(0,0,0,0.1)';
+                ctx.fillRect(Math.random()*512, Math.random()*512, 2, 4);
             }
             const tex = new THREE.CanvasTexture(canvas);
             tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -56,100 +124,50 @@
             return tex;
         }
 
-        function createGoalPost() {
-            const goalGroup = new THREE.Group();
-            const matGold = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.6, roughness: 0.2 });
-            
-            // Main Post
-            const mainPost = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15), matGold);
-            mainPost.position.y = 7.5;
-            
-            // Crossbar
-            const crossbar = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 18), matGold);
-            crossbar.rotation.z = Math.PI / 2;
-            crossbar.position.y = 15;
-            
-            // Uprights
-            const leftUpright = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 20), matGold);
-            leftUpright.position.set(-9, 25, 0);
-            
-            const rightUpright = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 20), matGold);
-            rightUpright.position.set(9, 25, 0);
-            
-            goalGroup.add(mainPost, crossbar, leftUpright, rightUpright);
-            goalGroup.position.set(0, 0, -480); // End of field
-            return goalGroup;
-        }
-
         function init() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x60a3bc);
-            scene.fog = new THREE.FogExp2(0x60a3bc, 0.0012);
+            scene.fog = new THREE.FogExp2(0x60a3bc, 0.001);
 
             camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 3000);
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
-            renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 1.0;
             document.body.appendChild(renderer.domElement);
 
-            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
-            const sun = new THREE.DirectionalLight(0xffffff, 2.0);
-            sun.position.set(200, 400, 100);
+            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+            const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+            sun.position.set(100, 200, 50);
             sun.castShadow = true;
-            sun.shadow.mapSize.set(2048, 2048);
             scene.add(sun);
 
-            // Add the Goal
-            scene.add(createGoalPost());
-
-            const grassLight = createGrassTexture('#2d5a27', '#3a6e33');
-            const grassDark = createGrassTexture('#244a1f', '#2d5a27');
-            const endzoneTex = createGrassTexture('#001a33', '#002244');
-
+            const grassL = createGrassTexture('#2d5a27', '#3a6e33');
+            const grassD = createGrassTexture('#244a1f', '#2d5a27');
             for(let i = -1500; i < 600; i += 20) {
-                const isEndzone = (i < -400 || i > 400);
-                const mat = new THREE.MeshPhysicalMaterial({ 
-                    map: isEndzone ? endzoneTex : ((i/20)%2===0 ? grassLight : grassDark),
-                    roughness: 0.6, metalness: 0.1, reflectivity: 0.5
-                });
+                const mat = new THREE.MeshStandardMaterial({ map: (i/20)%2===0 ? grassL : grassD });
                 const strip = new THREE.Mesh(new THREE.PlaneGeometry(260, 20), mat);
-                strip.rotation.x = -Math.PI/2;
-                strip.position.z = i + 10;
+                strip.rotation.x = -Math.PI/2; strip.position.z = i + 10;
                 strip.receiveShadow = true;
                 scene.add(strip);
-
-                const line = new THREE.Mesh(new THREE.PlaneGeometry(260, 0.6), new THREE.MeshStandardMaterial({color: 0xffffff, transparent: true, opacity: 0.8}));
-                line.rotation.x = -Math.PI/2;
-                line.position.set(0, 0.1, i);
-                scene.add(line);
             }
 
+            // PLAYER MODEL RESTORATION
             player = new THREE.Group();
             torsoGroup = new THREE.Group();
-            const matShell = new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0.1, roughness: 0.1, clearcoat: 1.0 });
-            const matOrange = new THREE.MeshStandardMaterial({ color: 0xfb4f14 });
-            const matChrome = new THREE.MeshPhysicalMaterial({ color: 0xcccccc, metalness: 1.0, roughness: 0.05 });
-            const matBlue = new THREE.MeshStandardMaterial({ color: 0x002244 });
-            const matSkin = new THREE.MeshStandardMaterial({ color: 0x8d5524 });
-
-            const torso = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 0.9, 2.2, 12), matShell);
+            const matWhite = new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0.1, roughness: 0.1, clearcoat: 1.0 });
+            
+            const torso = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 0.9, 2.2, 12), matWhite);
             torso.position.y = 1.1; torso.scale.set(1.1, 1, 0.7);
-            const waist = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.6, 12), matBlue);
-            waist.position.y = -0.3;
-            torsoGroup.add(torso, waist);
-            torsoGroup.position.y = 2.7;
+            torsoGroup.add(torso);
 
+            // ARM & LEG CREATION
             const createArm = (side) => {
                 const armPivot = new THREE.Group();
-                const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.3, 1.2), matShell);
+                const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.3, 1.2), matWhite);
                 upper.position.y = -0.6;
-                const lower = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.2, 1.2), matSkin);
+                const lower = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.2, 1.2), new THREE.MeshStandardMaterial({color: 0x8d5524}));
                 lower.position.y = -1.6;
-                armPivot.add(upper, lower);
-                armPivot.position.set(side * 1.3, 1.8, 0);
+                armPivot.add(upper, lower); armPivot.position.set(side * 1.3, 1.8, 0);
                 return armPivot;
             };
             leftArm = createArm(1); rightArm = createArm(-1);
@@ -157,88 +175,86 @@
 
             const createLeg = (side) => {
                 const legPivot = new THREE.Group();
-                const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.35, 1.6), matShell);
+                const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.35, 1.6), matWhite);
                 thigh.position.y = -0.8;
-                const shin = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.25, 1.6), matShell);
+                const shin = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.25, 1.6), matWhite);
                 shin.position.y = -2.2;
-                const foot = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.4, 1.2), matBlue);
+                const foot = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.4, 1.2), new THREE.MeshStandardMaterial({color: 0x002244}));
                 foot.position.set(0, -3.0, -0.3);
-                
-                legPivot.add(thigh, shin, foot);
-                legPivot.position.set(side * 0.5, 2.4, 0);
+                legPivot.add(thigh, shin, foot); legPivot.position.set(side * 0.5, 2.4, 0);
                 return legPivot;
             };
             leftLeg = createLeg(-1); rightLeg = createLeg(1);
-            player.add(leftLeg, rightLeg, torsoGroup);
-
-            const helm = new THREE.Mesh(new THREE.SphereGeometry(0.85, 32, 32), matShell);
+            
+            // THE HELMET
+            const helm = new THREE.Mesh(new THREE.SphereGeometry(0.85, 32, 32), matWhite);
             helm.position.y = 2.8;
-            const mask = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.05, 12, 24, Math.PI), matChrome);
+            const helmStripe = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.8, 1.8), new THREE.MeshStandardMaterial({color: 0xfb4f14}));
+            helmStripe.position.y = 2.8;
+            const mask = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.05, 12, 24, Math.PI), new THREE.MeshStandardMaterial({color: 0xcccccc, metalness: 1}));
             mask.position.set(0, 2.5, -0.55);
-            const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.22, 1.8, 1.8), matOrange);
-            stripe.position.y = 2.8;
-            torsoGroup.add(helm, mask, stripe);
+            torsoGroup.add(helm, helmStripe, mask);
 
-            player.traverse(n => { if(n.isMesh) n.castShadow = true; });
+            torsoGroup.position.y = 2.7;
+            player.add(leftLeg, rightLeg, torsoGroup);
             player.visible = false;
             scene.add(player);
+
+            // GOAL POST
+            const matGold = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.6 });
+            const goal = new THREE.Group();
+            const p1 = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15), matGold); p1.position.y = 7.5;
+            const p2 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 18), matGold); p2.rotation.z = Math.PI/2; p2.position.y = 15;
+            const p3 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 20), matGold); p3.position.set(-9, 25, 0);
+            const p4 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 20), matGold); p4.position.set(9, 25, 0);
+            goal.add(p1, p2, p3, p4); goal.position.z = -480;
+            scene.add(goal);
+
+            // NPCs
+            for(let i=0; i<6; i++) npcs.push(new Defender((Math.random()-0.5)*110, -120 - i*60));
 
             ballInHand = createEliteBall();
             ballInHand.position.set(1.2, -0.9, -2);
             camera.add(ballInHand);
             scene.add(camera);
 
-            document.getElementById('start-btn').onclick = () => { gameActive = true; document.getElementById('menu').style.display = 'none'; document.body.requestPointerLock(); };
+            document.getElementById('start-btn').onclick = () => { 
+                gameActive = true; document.getElementById('menu').style.display = 'none'; document.body.requestPointerLock(); 
+            };
             
             window.addEventListener('keydown', (e) => { 
-                const key = e.key.toLowerCase();
-                keys[key] = true; 
-                if(key === 'u') { is3rd = !is3rd; player.visible = is3rd; ballInHand.visible = !is3rd; }
-                if(gameActive && key === 'y' && !isKicking) {
-                    isKicking = true;
-                    kickProgress = 0;
-                    kickBall();
-                }
+                const k = e.key.toLowerCase(); keys[k] = true; 
+                if(k === 'u') { is3rd = !is3rd; player.visible = is3rd; ballInHand.visible = !is3rd; }
+                if(gameActive && k === 'y' && !isKicking) { isKicking = true; kickProgress = 0; kickBall(); }
             });
-            window.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
-            window.addEventListener('mousemove', (e) => { if(gameActive) { targetYaw -= e.movementX * 0.0015; targetPitch -= e.movementY * 0.0015; targetPitch = Math.max(-1.4, Math.min(1.4, targetPitch)); } });
+            window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+            window.addEventListener('mousemove', (e) => { 
+                if(gameActive) { targetYaw -= e.movementX*0.0015; targetPitch -= e.movementY*0.0015; targetPitch = Math.max(-1.4, Math.min(1.4, targetPitch)); } 
+            });
             window.addEventListener('mousedown', () => { if(gameActive) throwBall(); });
 
             animate();
         }
 
-        function createEliteBall() {
-            const ball = new THREE.Group();
-            const leather = new THREE.MeshStandardMaterial({ color: 0x4d2613, roughness: 0.8 });
-            const body = new THREE.Mesh(new THREE.SphereGeometry(0.55, 32, 32), leather);
-            body.scale.set(1, 0.8, 1.8); body.castShadow = true;
-            const r1 = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.03, 8, 32), new THREE.MeshBasicMaterial({color: 0xffffff}));
-            r1.position.z = 0.6;
-            const r2 = r1.clone(); r2.position.z = -0.6;
-            ball.add(body, r1, r2);
-            return ball;
-        }
-
         function throwBall() {
             const b = createEliteBall();
             const p = new THREE.Vector3();
-            if(!is3rd) ballInHand.getWorldPosition(p); else p.copy(playerPos).add(new THREE.Vector3(0,5,0));
+            if(!is3rd) ballInHand.getWorldPosition(p); else p.copy(playerPos).add(new THREE.Vector3(0, 5, 0));
             b.position.copy(p);
             const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
-            footballs.push({ mesh: b, vel: dir.multiplyScalar(3.6), grav: -0.05, rotSpeed: 0.5, scored: false });
+            footballs.push({ mesh: b, vel: dir.multiplyScalar(4.2), grav: -0.05, rotSpeed: 0.5, scored: false });
             scene.add(b);
-            shake = 0.08;
+            shake = 0.1;
         }
 
         function kickBall() {
             const b = createEliteBall();
-            const p = new THREE.Vector3().copy(playerPos).add(new THREE.Vector3(0, 0.5, -2));
-            b.position.copy(p);
+            b.position.copy(playerPos).add(new THREE.Vector3(0, 0.5, -2));
             const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
-            dir.y += 0.4; // Initial kick angle
-            footballs.push({ mesh: b, vel: dir.multiplyScalar(4.5), grav: -0.04, rotSpeed: 0.2, scored: false });
+            dir.y += 0.45;
+            footballs.push({ mesh: b, vel: dir.multiplyScalar(5.0), grav: -0.04, rotSpeed: 0.2, scored: false });
             scene.add(b);
-            shake = 0.12;
+            shake = 0.15;
         }
 
         function animate() {
@@ -247,8 +263,8 @@
                 currentYaw += (targetYaw - currentYaw) * 0.15;
                 currentPitch += (targetPitch - currentPitch) * 0.15;
 
-                const isMoving = keys['w'] || keys['s'] || keys['a'] || keys['d'];
-                const speed = keys['shift'] ? 1.5 : 0.8;
+                const moving = keys['w'] || keys['s'] || keys['a'] || keys['d'];
+                const speed = keys['shift'] ? 1.35 : 0.8;
                 const f = new THREE.Vector3(Math.sin(currentYaw), 0, Math.cos(currentYaw)).negate();
                 const r = new THREE.Vector3().crossVectors(f, new THREE.Vector3(0,1,0)).normalize();
 
@@ -257,81 +273,52 @@
                 if(keys['a']) playerPos.addScaledVector(r, -speed);
                 if(keys['d']) playerPos.addScaledVector(r, speed);
 
-                if(isMoving && !isKicking) {
+                // Animations
+                if(moving && !isKicking) {
                     walkCycle += keys['shift'] ? 0.3 : 0.15;
                     const swing = Math.sin(walkCycle) * 0.6;
-                    leftLeg.rotation.x = swing;
-                    rightLeg.rotation.x = -swing;
-                    leftArm.rotation.x = -swing;
-                    rightArm.rotation.x = swing;
+                    leftLeg.rotation.x = swing; rightLeg.rotation.x = -swing;
+                    leftArm.rotation.x = -swing; rightArm.rotation.x = swing;
                     torsoGroup.position.y = 2.7 + Math.abs(Math.cos(walkCycle)) * 0.15;
-                } else if(!isKicking) {
-                    leftLeg.rotation.x *= 0.8;
-                    rightLeg.rotation.x *= 0.8;
-                    leftArm.rotation.x *= 0.8;
-                    rightArm.rotation.x *= 0.8;
+                } else if (!isKicking) {
+                    leftLeg.rotation.x *= 0.8; rightLeg.rotation.x *= 0.8;
                     torsoGroup.position.y = THREE.MathUtils.lerp(torsoGroup.position.y, 2.7, 0.1);
                 }
 
                 if(isKicking) {
-                    kickProgress += 0.08; 
-                    if(kickProgress < 0.3) {
-                        rightLeg.rotation.x = THREE.MathUtils.lerp(0, 1.8, kickProgress / 0.3);
-                    } else if(kickProgress < 1.0) {
-                        rightLeg.rotation.x = THREE.MathUtils.lerp(1.8, 0, (kickProgress - 0.3) / 0.7);
-                    } else {
-                        isKicking = false;
-                        kickProgress = 0;
-                    }
+                    kickProgress += 0.08;
+                    rightLeg.rotation.x = (kickProgress < 0.3) ? THREE.MathUtils.lerp(0, 1.8, kickProgress/0.3) : THREE.MathUtils.lerp(1.8, 0, (kickProgress-0.3)/0.7);
+                    if(kickProgress >= 1) { isKicking = false; kickProgress = 0; }
                 }
 
                 player.position.copy(playerPos);
                 player.rotation.y = currentYaw;
                 camera.rotation.set(currentPitch, currentYaw, 0, 'YXZ');
                 
-                if(!is3rd) {
-                    camera.position.copy(playerPos).add(new THREE.Vector3(0, 5.2, 0.2));
-                } else {
-                    const tightOffset = new THREE.Vector3(1.8, 6.5, 12).applyQuaternion(camera.quaternion);
-                    camera.position.lerp(playerPos.clone().add(tightOffset), 0.15);
+                if(!is3rd) camera.position.copy(playerPos).add(new THREE.Vector3(0, 5.2, 0.2));
+                else {
+                    const offset = new THREE.Vector3(1.5, 7, 14).applyQuaternion(camera.quaternion);
+                    camera.position.lerp(playerPos.clone().add(offset), 0.15);
                 }
 
-                if(shake > 0) {
-                    camera.position.x += (Math.random()-0.5) * shake;
-                    camera.position.y += (Math.random()-0.5) * shake;
-                    shake *= 0.85;
-                }
+                if(shake > 0) { camera.position.x += (Math.random()-0.5)*shake; shake *= 0.85; }
 
-                // Ball Physics and Goal Detection
+                npcs.forEach(npc => npc.update(playerPos));
+
                 for (let i = footballs.length - 1; i >= 0; i--) {
                     let fb = footballs[i];
-                    fb.vel.y += fb.grav; 
-                    fb.mesh.position.add(fb.vel);
-                    fb.mesh.rotateZ(fb.rotSpeed); 
-                    fb.mesh.rotateX(0.05);
-
-                    // Goal Check (Crossbar is at z -480, y 15, width 18)
-                    if (!fb.scored && fb.mesh.position.z < -480 && fb.mesh.position.z > -490) {
-                        if (fb.mesh.position.y > 15 && Math.abs(fb.mesh.position.x) < 9) {
-                            fb.scored = true;
-                            score += 3; // Field Goal is 3 points
-                            document.getElementById('score').innerText = score;
-                            document.getElementById('score').style.color = "#ffff00";
-                            setTimeout(() => document.getElementById('score').style.color = "var(--nfl-orange)", 500);
+                    fb.vel.y += fb.grav; fb.mesh.position.add(fb.vel);
+                    fb.mesh.rotateZ(fb.rotSpeed);
+                    if(!fb.scored && fb.mesh.position.z < -480 && fb.mesh.position.z > -495) {
+                        if(fb.mesh.position.y > 15 && Math.abs(fb.mesh.position.x) < 9) {
+                            fb.scored = true; score += 3; document.getElementById('score').innerText = score;
+                            resetPlay("FIELD GOAL!");
                         }
                     }
-
-                    if (fb.mesh.position.y < 0.2 || fb.mesh.position.z < -600) { 
-                        scene.remove(fb.mesh); 
-                        footballs.splice(i, 1); 
-                    }
+                    if(fb.mesh.position.y < 0.1) { scene.remove(fb.mesh); footballs.splice(i, 1); }
                 }
 
-                if(playerPos.z < -440) { 
-                    score += 7; // Touchdown
-                    document.getElementById('score').innerText = score; 
-                    playerPos.set(0, 0, 150); 
-                }
+                if(playerPos.z < -450) { score += 7; document.getElementById('score').innerText = score; resetPlay("TOUCHDOWN!"); }
             }
             renderer.render(scene, camera);
         }
