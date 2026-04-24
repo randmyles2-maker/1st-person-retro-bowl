@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>football - Fixed Kick Physics</title>
+    <title>football - Field Goal Edition</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
     <style>
         :root { --nfl-orange: #fb4f14; --nfl-blue: #002244; }
@@ -18,12 +18,12 @@
 </head>
 <body>
 
-    <div id="ui"><div id="stats">eps: <span id="score" style="color:var(--nfl-orange)">0</span></div></div>
+    <div id="ui"><div id="stats">SCORE: <span id="score" style="color:var(--nfl-orange)">0</span></div></div>
 
     <div id="menu">
         <h1 style="font-size: 90px; margin: 0; letter-spacing: -4px;">FOOTBALL</h1>
         <button class="btn" id="start-btn">START</button>
-        <p style="margin-top:20px;"><b>KICK PHYSICS FIXED</b> | Y to Kick | WASD to Move</p>
+        <p style="margin-top:20px;"><b>KICK THROUGH THE UPRIGHTS</b> | Y to Kick | WASD to Move</p>
     </div>
 
     <script>
@@ -35,9 +35,8 @@
         let currentYaw = 0, currentPitch = 0;
         let shake = 0, walkCycle = 0;
         
-        // Kick Animation Variables
         let isKicking = false;
-        let kickProgress = 0; // 0 to 1
+        let kickProgress = 0; 
 
         let leftLeg, rightLeg, leftArm, rightArm, torsoGroup;
 
@@ -55,6 +54,31 @@
             tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
             tex.repeat.set(4, 1);
             return tex;
+        }
+
+        function createGoalPost() {
+            const goalGroup = new THREE.Group();
+            const matGold = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.6, roughness: 0.2 });
+            
+            // Main Post
+            const mainPost = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15), matGold);
+            mainPost.position.y = 7.5;
+            
+            // Crossbar
+            const crossbar = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 18), matGold);
+            crossbar.rotation.z = Math.PI / 2;
+            crossbar.position.y = 15;
+            
+            // Uprights
+            const leftUpright = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 20), matGold);
+            leftUpright.position.set(-9, 25, 0);
+            
+            const rightUpright = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 20), matGold);
+            rightUpright.position.set(9, 25, 0);
+            
+            goalGroup.add(mainPost, crossbar, leftUpright, rightUpright);
+            goalGroup.position.set(0, 0, -480); // End of field
+            return goalGroup;
         }
 
         function init() {
@@ -77,6 +101,9 @@
             sun.castShadow = true;
             sun.shadow.mapSize.set(2048, 2048);
             scene.add(sun);
+
+            // Add the Goal
+            scene.add(createGoalPost());
 
             const grassLight = createGrassTexture('#2d5a27', '#3a6e33');
             const grassDark = createGrassTexture('#244a1f', '#2d5a27');
@@ -129,7 +156,7 @@
             torsoGroup.add(leftArm, rightArm);
 
             const createLeg = (side) => {
-                const legPivot = new THREE.Group(); // This rotates from the hip
+                const legPivot = new THREE.Group();
                 const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.35, 1.6), matShell);
                 thigh.position.y = -0.8;
                 const shin = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.25, 1.6), matShell);
@@ -144,10 +171,6 @@
             leftLeg = createLeg(-1); rightLeg = createLeg(1);
             player.add(leftLeg, rightLeg, torsoGroup);
 
-            const jerseyNum = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1, 0.15), matBlue);
-            jerseyNum.position.set(0, 1.3, 0.45);
-            torsoGroup.add(jerseyNum);
-            
             const helm = new THREE.Mesh(new THREE.SphereGeometry(0.85, 32, 32), matShell);
             helm.position.y = 2.8;
             const mask = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.05, 12, 24, Math.PI), matChrome);
@@ -202,7 +225,7 @@
             if(!is3rd) ballInHand.getWorldPosition(p); else p.copy(playerPos).add(new THREE.Vector3(0,5,0));
             b.position.copy(p);
             const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
-            footballs.push({ mesh: b, vel: dir.multiplyScalar(3.6), grav: -0.05, rotSpeed: 0.5 });
+            footballs.push({ mesh: b, vel: dir.multiplyScalar(3.6), grav: -0.05, rotSpeed: 0.5, scored: false });
             scene.add(b);
             shake = 0.08;
         }
@@ -212,8 +235,8 @@
             const p = new THREE.Vector3().copy(playerPos).add(new THREE.Vector3(0, 0.5, -2));
             b.position.copy(p);
             const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
-            dir.y += 0.4;
-            footballs.push({ mesh: b, vel: dir.multiplyScalar(4.2), grav: -0.04, rotSpeed: 0.2 });
+            dir.y += 0.4; // Initial kick angle
+            footballs.push({ mesh: b, vel: dir.multiplyScalar(4.5), grav: -0.04, rotSpeed: 0.2, scored: false });
             scene.add(b);
             shake = 0.12;
         }
@@ -234,7 +257,6 @@
                 if(keys['a']) playerPos.addScaledVector(r, -speed);
                 if(keys['d']) playerPos.addScaledVector(r, speed);
 
-                // --- IMPROVED ANIMATION SYSTEM ---
                 if(isMoving && !isKicking) {
                     walkCycle += keys['shift'] ? 0.3 : 0.15;
                     const swing = Math.sin(walkCycle) * 0.6;
@@ -244,7 +266,6 @@
                     rightArm.rotation.x = swing;
                     torsoGroup.position.y = 2.7 + Math.abs(Math.cos(walkCycle)) * 0.15;
                 } else if(!isKicking) {
-                    // Smooth Return to Idle
                     leftLeg.rotation.x *= 0.8;
                     rightLeg.rotation.x *= 0.8;
                     leftArm.rotation.x *= 0.8;
@@ -252,22 +273,18 @@
                     torsoGroup.position.y = THREE.MathUtils.lerp(torsoGroup.position.y, 2.7, 0.1);
                 }
 
-              // --- REALISTIC KICK MOTION (RIGHT LEG) ---
-if(isKicking) {
-    kickProgress += 0.08; 
-    
-    if(kickProgress < 0.3) {
-        // Swing the RIGHT leg FORWARD (Positive 1.8)
-        rightLeg.rotation.x = THREE.MathUtils.lerp(0, 1.8, kickProgress / 0.3);
-        leftLeg.rotation.x = 0; // Keep left leg on the ground
-    } else if(kickProgress < 1.0) {
-        // Return RIGHT leg to standing position
-        rightLeg.rotation.x = THREE.MathUtils.lerp(1.8, 0, (kickProgress - 0.3) / 0.7);
-    } else {
-        isKicking = false;
-        kickProgress = 0;
-    }
-}
+                if(isKicking) {
+                    kickProgress += 0.08; 
+                    if(kickProgress < 0.3) {
+                        rightLeg.rotation.x = THREE.MathUtils.lerp(0, 1.8, kickProgress / 0.3);
+                    } else if(kickProgress < 1.0) {
+                        rightLeg.rotation.x = THREE.MathUtils.lerp(1.8, 0, (kickProgress - 0.3) / 0.7);
+                    } else {
+                        isKicking = false;
+                        kickProgress = 0;
+                    }
+                }
+
                 player.position.copy(playerPos);
                 player.rotation.y = currentYaw;
                 camera.rotation.set(currentPitch, currentYaw, 0, 'YXZ');
@@ -285,14 +302,36 @@ if(isKicking) {
                     shake *= 0.85;
                 }
 
+                // Ball Physics and Goal Detection
                 for (let i = footballs.length - 1; i >= 0; i--) {
                     let fb = footballs[i];
-                    fb.vel.y += fb.grav; fb.mesh.position.add(fb.vel);
-                    fb.mesh.rotateZ(fb.rotSpeed); fb.mesh.rotateX(0.05);
-                    if (fb.mesh.position.y < 0.2) { scene.remove(fb.mesh); footballs.splice(i, 1); }
+                    fb.vel.y += fb.grav; 
+                    fb.mesh.position.add(fb.vel);
+                    fb.mesh.rotateZ(fb.rotSpeed); 
+                    fb.mesh.rotateX(0.05);
+
+                    // Goal Check (Crossbar is at z -480, y 15, width 18)
+                    if (!fb.scored && fb.mesh.position.z < -480 && fb.mesh.position.z > -490) {
+                        if (fb.mesh.position.y > 15 && Math.abs(fb.mesh.position.x) < 9) {
+                            fb.scored = true;
+                            score += 3; // Field Goal is 3 points
+                            document.getElementById('score').innerText = score;
+                            document.getElementById('score').style.color = "#ffff00";
+                            setTimeout(() => document.getElementById('score').style.color = "var(--nfl-orange)", 500);
+                        }
+                    }
+
+                    if (fb.mesh.position.y < 0.2 || fb.mesh.position.z < -600) { 
+                        scene.remove(fb.mesh); 
+                        footballs.splice(i, 1); 
+                    }
                 }
 
-                if(playerPos.z < -440) { score++; document.getElementById('score').innerText = score; playerPos.set(0, 0, 150); }
+                if(playerPos.z < -440) { 
+                    score += 7; // Touchdown
+                    document.getElementById('score').innerText = score; 
+                    playerPos.set(0, 0, 150); 
+                }
             }
             renderer.render(scene, camera);
         }
