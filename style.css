@@ -1,0 +1,75 @@
+:root { 
+    --nfl-orange: #fb4f14; 
+    --nfl-blue: #002244; 
+}
+
+body { 
+    margin: 0; 
+    padding: 0; 
+    overflow: hidden; 
+    background: #000; 
+    font-family: 'Arial Black', sans-serif; 
+}
+
+canvas { 
+    display: block; 
+}
+
+#ui { 
+    position: absolute; 
+    inset: 0; 
+    pointer-events: none; 
+    z-index: 10; 
+    padding: 40px; 
+}
+
+#stats { 
+    color: white; 
+    font-size: 42px; 
+    text-shadow: 0px 4px 10px rgba(0,0,0,0.8); 
+    font-style: italic; 
+}
+
+#menu { 
+    position: absolute; 
+    inset: 0; 
+    background: radial-gradient(circle, rgba(0,20,40,0.95), #000); 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; 
+    justify-content: center; 
+    color: white; 
+    z-index: 100; 
+    text-align: center; 
+}
+
+.btn { 
+    padding: 25px 100px; 
+    background: var(--nfl-orange); 
+    color: white; 
+    border: 2px solid white; 
+    font-size: 32px; 
+    cursor: pointer; 
+    font-weight: bold; 
+    text-transform: uppercase; 
+    border-radius: 4px; 
+    box-shadow: 0 10px 0 #8a2b0c; 
+}
+
+.btn:active { 
+    transform: translateY(6px); 
+    box-shadow: 0 4px 0 #8a2b0c; 
+}
+
+#msg { 
+    position: absolute; 
+    top: 20%; 
+    width: 100%; 
+    text-align: center; 
+    color: var(--nfl-orange); 
+    font-size: 80px; 
+    display: none; 
+    pointer-events: none; 
+    text-shadow: 4px 4px 0 #000; 
+    z-index: 1000; 
+}
