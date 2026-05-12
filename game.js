@@ -214,7 +214,9 @@ function init() {
     window.addEventListener('keydown', (e) => {
         const k = e.key.toLowerCase(); keys[k] = true;
         if (k === 'u') { is3rd = !is3rd; player.visible = is3rd; ballInHand.visible = !is3rd; }
-        if (gameActive && k === 'y' && !isKicking) { isKicking = true; kickProgress = 0; kickBall(); }
+        if (gameActive && k === 'y') { 
+    kickBall(); 
+    }
     });
     window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
     window.addEventListener('mousemove', (e) => {
