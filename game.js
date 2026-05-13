@@ -66,57 +66,57 @@ function createFullCharacter(pCol, sCol) {
     const group = new THREE.Group();
     const charGroup = new THREE.Group();
     
-    // High-performance materials
+    // High-quality materials
     const matP = new THREE.MeshStandardMaterial({ 
         color: pCol, 
         roughness: 0.3, 
-        metalness: 0.4 
+        metalness: 0.3 
     });
     const matVisor = new THREE.MeshPhysicalMaterial({ 
         color: 0x111111, 
-        metalness: 1, 
-        roughness: 0.1, 
+        metalness: 1.0, 
+        roughness: 0.05, 
         transparent: true, 
         opacity: 0.9 
     });
 
-    // 1. Detailed Torso (Athletic V-Shape)
-    const torso = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 0.8, 2.6, 10), matP);
+    // 1. Detailed Torso (Gridiron Silhouette)
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 0.8, 2.6, 10), matP);
     torso.position.y = 1.3;
     charGroup.add(torso);
 
-    // 2. Shoulder Pads
-    const padGeom = new THREE.SphereGeometry(0.8, 12, 12);
+    // 2. Shoulder Pads (Essential for 'Pro' look)
+    const padGeom = new THREE.SphereGeometry(0.85, 12, 12);
     const leftPad = new THREE.Mesh(padGeom, matP);
-    leftPad.scale.set(1.3, 0.7, 1.1);
-    leftPad.position.set(1.5, 2.4, 0);
+    leftPad.scale.set(1.4, 0.7, 1.2);
+    leftPad.position.set(1.6, 2.4, 0);
     
     const rightPad = leftPad.clone();
-    rightPad.position.x = -1.5;
+    rightPad.position.x = -1.6;
     charGroup.add(leftPad, rightPad);
 
     // 3. Helmet & Visor
     const helm = new THREE.Mesh(new THREE.SphereGeometry(0.95, 20, 20), matP);
-    helm.position.y = 3.2;
+    helm.position.y = 3.3;
     
-    // Modern Dark Visor
+    // The "Detailed" Look: A tinted visor
     const visor = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.25, 10, 20, Math.PI), matVisor);
-    visor.position.set(0, 3.2, -0.45);
+    visor.position.set(0, 3.3, -0.45);
     visor.scale.set(1.3, 0.7, 1);
     charGroup.add(helm, visor);
 
-    // 4. Legs with Cleats/Shoes
+    // 4. Legs with Cleats
     const legPivot = (side) => {
         const p = new THREE.Group();
-        const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.35, 3.2), matP);
+        const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.4, 3.2), matP);
         thigh.position.y = -1.6;
         
-        // Foot/Shoe detail
-        const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.4, 1.3), new THREE.MeshStandardMaterial({color: 0x111111}));
-        shoe.position.set(0, -3.2, -0.3);
+        // Shoe/Cleat detail
+        const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.45, 1.4), new THREE.MeshStandardMaterial({color: 0x000000}));
+        shoe.position.set(0, -3.2, -0.2);
         
         p.add(thigh, shoe);
-        p.position.set(side * 0.7, 2.4, 0);
+        p.position.set(side * 0.75, 2.4, 0);
         return p;
     };
     
@@ -170,10 +170,15 @@ function init() {
     renderer.shadowMap.enabled = true;
     document.body.appendChild(renderer.domElement);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+    // Enhanced Lighting for detail
+    scene.add(new THREE.AmbientLight(0xffffff, 0.4)); // Lower ambient for better shadows
+    const sun = new THREE.DirectionalLight(0xffffff, 2.5); // Boosted for highlights
     sun.position.set(100, 200, 50);
     sun.castShadow = true;
+    
+    // Sharper shadows for higher detail
+    sun.shadow.mapSize.width = 2048;
+    sun.shadow.mapSize.height = 2048;
     scene.add(sun);
 
     const grassL = createGrassTexture('#2d5a27', '#3a6e33');
