@@ -66,53 +66,54 @@ function createFullCharacter(pCol, sCol) {
     const group = new THREE.Group();
     const charGroup = new THREE.Group();
     
-    // High-quality materials
+    // High-performance materials
     const matP = new THREE.MeshStandardMaterial({ 
         color: pCol, 
-        roughness: 0.4, 
-        metalness: 0.2 
+        roughness: 0.3, 
+        metalness: 0.4 
     });
     const matVisor = new THREE.MeshPhysicalMaterial({ 
         color: 0x111111, 
         metalness: 1, 
-        roughness: 0, 
+        roughness: 0.1, 
         transparent: true, 
         opacity: 0.9 
     });
 
-    // Detailed Torso (V-Shape)
-    const torso = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 0.8, 2.5, 8), matP);
-    torso.position.y = 1.2;
+    // 1. Detailed Torso (Athletic V-Shape)
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 0.8, 2.6, 10), matP);
+    torso.position.y = 1.3;
     charGroup.add(torso);
 
-    // Shoulder Pads (The "Detailed" Look)
-    const padGeom = new THREE.SphereGeometry(0.8, 8, 8);
+    // 2. Shoulder Pads
+    const padGeom = new THREE.SphereGeometry(0.8, 12, 12);
     const leftPad = new THREE.Mesh(padGeom, matP);
-    leftPad.scale.set(1.2, 0.7, 1);
-    leftPad.position.set(1.4, 2.2, 0);
+    leftPad.scale.set(1.3, 0.7, 1.1);
+    leftPad.position.set(1.5, 2.4, 0);
     
     const rightPad = leftPad.clone();
-    rightPad.position.x = -1.4;
+    rightPad.position.x = -1.5;
     charGroup.add(leftPad, rightPad);
 
-    // Detailed Helmet
-    const helm = new THREE.Mesh(new THREE.SphereGeometry(0.9, 16, 16), matP);
-    helm.position.y = 3.0;
+    // 3. Helmet & Visor
+    const helm = new THREE.Mesh(new THREE.SphereGeometry(0.95, 20, 20), matP);
+    helm.position.y = 3.2;
     
-    // Visor
-    const visor = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.2, 8, 16, Math.PI), matVisor);
-    visor.position.set(0, 3.0, -0.45);
-    visor.scale.set(1.2, 0.8, 1);
+    // Modern Dark Visor
+    const visor = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.25, 10, 20, Math.PI), matVisor);
+    visor.position.set(0, 3.2, -0.45);
+    visor.scale.set(1.3, 0.7, 1);
     charGroup.add(helm, visor);
 
-    // Legs with "Shoes"
+    // 4. Legs with Cleats/Shoes
     const legPivot = (side) => {
         const p = new THREE.Group();
-        const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.4, 3), matP);
-        thigh.position.y = -1.5;
+        const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.35, 3.2), matP);
+        thigh.position.y = -1.6;
         
-        const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.4, 1.2), new THREE.MeshStandardMaterial({color: 0x111111}));
-        shoe.position.set(0, -3.0, -0.3);
+        // Foot/Shoe detail
+        const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.4, 1.3), new THREE.MeshStandardMaterial({color: 0x111111}));
+        shoe.position.set(0, -3.2, -0.3);
         
         p.add(thigh, shoe);
         p.position.set(side * 0.7, 2.4, 0);
