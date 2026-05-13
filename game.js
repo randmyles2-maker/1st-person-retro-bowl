@@ -62,67 +62,96 @@ function resetPlay(text) {
 }
 
 // --- MODELS ---
-function createFullCharacter(pCol, sCol) {
+function createFullCharacter(jerseyCol, pantsCol) {
     const group = new THREE.Group();
     const charGroup = new THREE.Group();
     
-    // High-quality materials
-    const matP = new THREE.MeshStandardMaterial({ 
-        color: pCol, 
-        roughness: 0.3, 
-        metalness: 0.3 
+    // PBR Materials (Physically Based Rendering)
+    const jerseyMat = new THREE.MeshStandardMaterial({ 
+        color: jerseyCol, roughness: 0.3, metalness: 0.1, 
+        flatShading: false // Smooths out the "blocky" look
     });
-    const matVisor = new THREE.MeshPhysicalMaterial({ 
-        color: 0x111111, 
-        metalness: 1.0, 
-        roughness: 0.05, 
-        transparent: true, 
-        opacity: 0.9 
+    const pantsMat = new THREE.MeshStandardMaterial({ color: pantsCol, roughness: 0.8 });
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0x8d5524, roughness: 0.9 }); // Athletic skin tone
+    const chromeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.1 });
+    const visorMat = new THREE.MeshPhysicalMaterial({ 
+        color: 0x000000, metalness: 1, roughness: 0, transparent: true, opacity: 0.85, transmission: 0.5 
     });
 
-    // 1. Detailed Torso (Gridiron Silhouette)
-    const torso = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 0.8, 2.6, 10), matP);
-    torso.position.y = 1.3;
-    charGroup.add(torso);
+    // --- THE TORSO (V-Taper Anatomy) ---
+    // Upper Chest/Jersey
+    const chest = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.2, 2.8, 24), jerseyMat);
+    chest.position.y = 1.4;
+    chest.scale.set(1.15, 1, 0.75); 
+    charGroup.add(chest);
 
-    // 2. Shoulder Pads (Essential for 'Pro' look)
-    const padGeom = new THREE.SphereGeometry(0.85, 12, 12);
-    const leftPad = new THREE.Mesh(padGeom, matP);
-    leftPad.scale.set(1.4, 0.7, 1.2);
-    leftPad.position.set(1.6, 2.4, 0);
-    
-    const rightPad = leftPad.clone();
-    rightPad.position.x = -1.6;
-    charGroup.add(leftPad, rightPad);
+    // Heavy Shoulder Pads (Slanted for aggressive posture)
+    const padGeom = new THREE.SphereGeometry(1, 24, 24);
+    const lPad = new THREE.Mesh(padGeom, jerseyMat);
+    lPad.position.set(1.5, 2.5, 0);
+    lPad.scale.set(1.3, 0.65, 1.2);
+    lPad.rotation.z = -0.4;
+    const rPad = lPad.clone(); rPad.position.x = -1.5; rPad.rotation.z = 0.4;
+    charGroup.add(lPad, rPad);
 
-    // 3. Helmet & Visor
-    const helm = new THREE.Mesh(new THREE.SphereGeometry(0.95, 20, 20), matP);
-    helm.position.y = 3.3;
-    
-    // The "Detailed" Look: A tinted visor
-    const visor = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.25, 10, 20, Math.PI), matVisor);
-    visor.position.set(0, 3.3, -0.45);
-    visor.scale.set(1.3, 0.7, 1);
-    charGroup.add(helm, visor);
-
-    // 4. Legs with Cleats
-    const legPivot = (side) => {
-        const p = new THREE.Group();
-        const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.4, 3.2), matP);
-        thigh.position.y = -1.6;
+    // --- ARMS (Biceps + Forearms + Tape) ---
+    const createArm = (side) => {
+        const armGroup = new THREE.Group();
+        const bicep = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.45, 1.3, 16), jerseyMat);
+        const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.28, 1.4, 16), skinMat);
+        const tape = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.29, 0.6, 16), new THREE.MeshStandardMaterial({color: 0xffffff}));
         
-        // Shoe/Cleat detail
-        const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.45, 1.4), new THREE.MeshStandardMaterial({color: 0x000000}));
-        shoe.position.set(0, -3.2, -0.2);
+        bicep.position.y = -0.6;
+        forearm.position.y = -1.8;
+        tape.position.y = -2.2; // Athlete wrist tape
         
-        p.add(thigh, shoe);
-        p.position.set(side * 0.75, 2.4, 0);
-        return p;
+        armGroup.add(bicep, forearm, tape);
+        armGroup.position.set(side * 1.65, 2.2, 0);
+        return armGroup;
     };
     
-    const lLeg = legPivot(1);
-    const rLeg = legPivot(-1);
+    // Set globals for player animation
+    if (jerseyCol === 0xffffff) {
+        leftArm = createArm(1); rightArm = createArm(-1);
+        charGroup.add(leftArm, rightArm);
+    } else {
+        charGroup.add(createArm(1), createArm(-1));
+    }
 
+    // --- HELMET (Professional Speed-Flex Style) ---
+    const helm = new THREE.Mesh(new THREE.SphereGeometry(1.1, 32, 32), jerseyMat);
+    helm.position.y = 3.5;
+    helm.scale.set(0.9, 1, 1.15);
+    
+    // Tinted Chrome Visor
+    const visor = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.28, 16, 32, Math.PI), visorMat);
+    visor.position.set(0, 3.4, -0.6);
+    visor.scale.set(1.2, 0.65, 1);
+    
+    // Realistic Chrome Face Grill
+    const grill = new THREE.Mesh(new THREE.TorusGeometry(0.65, 0.06, 8, 32, Math.PI), chromeMat);
+    grill.position.set(0, 3.1, -0.5);
+    grill.rotation.x = 0.3;
+    charGroup.add(helm, visor, grill);
+
+    // --- LEGS (Thighs + Calves + Cleats) ---
+    const createLeg = (side) => {
+        const legPivot = new THREE.Group();
+        const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.55, 2, 16), pantsMat);
+        const calf = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.35, 1.8, 16), pantsMat);
+        const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 1.8), new THREE.MeshStandardMaterial({color: 0x111111, roughness: 0.2}));
+        
+        thigh.position.y = -1.0;
+        calf.position.y = -2.8;
+        shoe.position.set(0, -3.7, -0.4); // Protruding toe
+        
+        legPivot.add(thigh, calf, shoe);
+        legPivot.position.set(side * 0.8, 2.4, 0);
+        return legPivot;
+    };
+    
+    const lLeg = createLeg(1);
+    const rLeg = createLeg(-1);
     charGroup.position.y = 2.7;
     group.add(lLeg, rLeg, charGroup);
     
@@ -166,21 +195,33 @@ function init() {
 
     camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 3000);
     renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio); // Force high-res rendering
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Smoother shadows
     document.body.appendChild(renderer.domElement);
 
-    // Enhanced Lighting for detail
-    scene.add(new THREE.AmbientLight(0xffffff, 0.4)); // Lower ambient for better shadows
-    const sun = new THREE.DirectionalLight(0xffffff, 2.5); // Boosted for highlights
-    sun.position.set(100, 200, 50);
+    // --- 4K LIGHTING ENGINE ---
+    scene.add(new THREE.AmbientLight(0xffffff, 0.2)); // Low ambient for depth
+    
+    // Hemisphere light simulates sky bounce (Blue sky / Green grass)
+    const hemiLight = new THREE.HemisphereLight(0x60a3bc, 0x2d5a27, 0.8);
+    scene.add(hemiLight);
+
+    const sun = new THREE.DirectionalLight(0xffffff, 2.5);
+    sun.position.set(50, 200, 50);
     sun.castShadow = true;
     
-    // Sharper shadows for higher detail
-    sun.shadow.mapSize.width = 2048;
-    sun.shadow.mapSize.height = 2048;
+    // Extreme Shadow Resolution
+    sun.shadow.mapSize.width = 4096;
+    sun.shadow.mapSize.height = 4096;
+    sun.shadow.camera.left = -200;
+    sun.shadow.camera.right = 200;
+    sun.shadow.camera.top = 200;
+    sun.shadow.camera.bottom = -200;
     scene.add(sun);
 
+    // --- FIELD GENERATION ---
     const grassL = createGrassTexture('#2d5a27', '#3a6e33');
     const grassD = createGrassTexture('#244a1f', '#2d5a27');
     for (let i = -1500; i < 600; i += 20) {
@@ -191,86 +232,110 @@ function init() {
         scene.add(strip);
     }
 
-    // PLAYER SETUP
-    player = new THREE.Group();
-    torsoGroup = new THREE.Group();
-    const matWhite = new THREE.MeshPhysicalMaterial({ color: 0xffffff });
+    // --- 4K PLAYER SETUP ---
+    // Using the upgraded anatomical character function
+    const playerModel = createFullCharacter(0xffffff, 0xffffff); // White pro jersey/pants
+    player = playerModel.group;
+    leftLeg = playerModel.lLeg;
+    rightLeg = playerModel.rLeg;
+    
+    // Reference the torso group (the 3rd child in group) for walk-cycle bobbing
+    torsoGroup = player.children[2]; 
 
-    const torso = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 0.9, 2.2, 12), matWhite);
-    torso.position.y = 1.1; torso.scale.set(1.1, 1, 0.7);
-    torsoGroup.add(torso);
-
-    const createArm = (side) => {
-        const p = new THREE.Group();
-        const u = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.3, 1.2), matWhite);
-        u.position.y = -0.6; p.add(u);
-        p.position.set(side * 1.3, 1.8, 0); return p;
-    };
-    leftArm = createArm(1); rightArm = createArm(-1);
-    torsoGroup.add(leftArm, rightArm);
-
-    const createLeg = (side) => {
-        const p = new THREE.Group();
-        const t = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.35, 3.2), matWhite);
-        t.position.y = -1.6; p.add(t);
-        p.position.set(side * 0.5, 2.4, 0); return p;
-    };
-    leftLeg = createLeg(-1); rightLeg = createLeg(1);
-
-    const helm = new THREE.Mesh(new THREE.SphereGeometry(0.85, 32, 32), matWhite);
-    helm.position.y = 2.8;
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.8, 1.8), new THREE.MeshStandardMaterial({ color: 0xfb4f14 }));
-    stripe.position.y = 2.8;
-    const mask = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.05, 12, 24, Math.PI), new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 1 }));
-    mask.position.set(0, 2.5, -0.55);
-    torsoGroup.add(helm, stripe, mask);
-
-    torsoGroup.position.y = 2.7;
-    player.add(leftLeg, rightLeg, torsoGroup);
     player.visible = false;
     scene.add(player);
 
-    // GOAL
-    const matGold = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.6 });
+    // --- GOAL SETUP ---
+    const matGold = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.8, roughness: 0.2 });
     const goal = new THREE.Group();
-    const p1 = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15), matGold); p1.position.y = 7.5;
-    const p2 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 18), matGold); p2.rotation.z = Math.PI / 2; p2.position.y = 15;
-    const p3 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 20), matGold); p3.position.set(-9, 25, 0);
-    const p4 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 20), matGold); p4.position.set(9, 25, 0);
+    const p1 = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 16), matGold); p1.position.y = 7.5;
+    const p2 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 18, 16), matGold); p2.rotation.z = Math.PI / 2; p2.position.y = 15;
+    const p3 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 20, 16), matGold); p3.position.set(-9, 25, 0);
+    const p4 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 20, 16), matGold); p4.position.set(9, 25, 0);
+    goal.traverse(m => { if(m.isMesh) m.castShadow = true; });
     goal.add(p1, p2, p3, p4); goal.position.z = -480;
     scene.add(goal);
 
+    // --- BOTS ---
     for (let i = 0; i < 5; i++) teammates.push(new Bot((i - 2) * 20, 130, 0xffffff, true));
     for (let i = 0; i < 12; i++) enemies.push(new Bot((Math.random() - 0.5) * 150, -100 - i * 60, 0xbb0000, false));
 
+    // --- BALL HANDLING ---
     ballInHand = createEliteBall();
     ballInHand.position.set(1.2, -0.9, -2);
     camera.add(ballInHand);
     scene.add(camera);
 
+    // --- INPUTS & EVENTS ---
     document.getElementById('start-btn').onclick = () => {
-        gameActive = true; document.getElementById('menu').style.display = 'none'; document.body.requestPointerLock();
+        gameActive = true; 
+        document.getElementById('menu').style.display = 'none'; 
+        document.body.requestPointerLock();
     };
 
     window.addEventListener('keydown', (e) => {
-        const k = e.key.toLowerCase(); keys[k] = true;
+        const k = e.key.toLowerCase(); 
+        keys[k] = true;
         if (k === 'u') { is3rd = !is3rd; player.visible = is3rd; ballInHand.visible = !is3rd; }
-        if (gameActive && k === 'y') { 
-    kickBall(); 
-    }
+        if (gameActive && k === 'y') kickBall(); // Unlimited kicking enabled
     });
+
     window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
+
     window.addEventListener('mousemove', (e) => {
         if (gameActive) {
-            targetYaw -= e.movementX * 0.0015; targetPitch -= e.movementY * 0.0015;
+            targetYaw -= e.movementX * 0.0015; 
+            targetPitch -= e.movementY * 0.0015;
             targetPitch = Math.max(-1.4, Math.min(1.4, targetPitch));
         }
     });
+
     window.addEventListener('mousedown', () => { if (gameActive) throwBall(); });
 
     animate();
 }
 
+// Ensure your createFullCharacter function includes the anatomical details:
+function createFullCharacter(jerseyCol, pantsCol) {
+    const group = new THREE.Group();
+    const charGroup = new THREE.Group();
+    const jerseyMat = new THREE.MeshStandardMaterial({ color: jerseyCol, roughness: 0.4, metalness: 0.1 });
+    const pantsMat = new THREE.MeshStandardMaterial({ color: pantsCol, roughness: 0.8 });
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0x8d5524, roughness: 0.9 });
+    const visorMat = new THREE.MeshPhysicalMaterial({ color: 0x000000, metalness: 1, roughness: 0, transparent: true, opacity: 0.85 });
+
+    const chest = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.2, 2.8, 24), jerseyMat);
+    chest.position.y = 1.4; chest.scale.set(1.15, 1, 0.75); 
+    charGroup.add(chest);
+
+    const padGeom = new THREE.SphereGeometry(1, 24, 24);
+    const lPad = new THREE.Mesh(padGeom, jerseyMat);
+    lPad.position.set(1.5, 2.5, 0); lPad.scale.set(1.3, 0.65, 1.2); lPad.rotation.z = -0.4;
+    const rPad = lPad.clone(); rPad.position.x = -1.5; rPad.rotation.z = 0.4;
+    charGroup.add(lPad, rPad);
+
+    const helm = new THREE.Mesh(new THREE.SphereGeometry(1.1, 32, 32), jerseyMat);
+    helm.position.y = 3.5;
+    const visor = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.28, 16, 32, Math.PI), visorMat);
+    visor.position.set(0, 3.4, -0.6); visor.scale.set(1.2, 0.65, 1);
+    charGroup.add(helm, visor);
+
+    const createLeg = (side) => {
+        const legPivot = new THREE.Group();
+        const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.55, 2, 16), pantsMat);
+        const calf = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.35, 1.8, 16), pantsMat);
+        const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 1.8), new THREE.MeshStandardMaterial({color: 0x111111}));
+        thigh.position.y = -1.0; calf.position.y = -2.8; shoe.position.set(0, -3.7, -0.4);
+        legPivot.add(thigh, calf, shoe);
+        legPivot.position.set(side * 0.8, 2.4, 0);
+        return legPivot;
+    };
+    
+    const lLeg = createLeg(1); const rLeg = createLeg(-1);
+    charGroup.position.y = 2.7;
+    group.add(lLeg, rLeg, charGroup);
+    return { group, lLeg, rLeg };
+}
 function throwBall() {
     const b = createEliteBall();
     const p = new THREE.Vector3();
