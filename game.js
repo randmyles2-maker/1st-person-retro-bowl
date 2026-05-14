@@ -9,10 +9,10 @@ let isKicking = false, kickProgress = 0;
 
 let leftLeg, rightLeg, leftArm, rightArm, torsoGroup;
 
-// --- BOT CLASS (Optimized) ---
+// --- BOT CLASS ---
 class Bot {
     constructor(x, z, color, isTeammate) {
-        // Optimization: Pass 'false' to use low-detail geometry for bots
+        // Optimization: Bots use 12 segments (standard for 2K) instead of 32
         const char = createFullCharacter(color, 0x002244, false);
         this.group = char.group;
         this.lLeg = char.lLeg;
@@ -62,43 +62,43 @@ function resetPlay(text) {
     teammates.forEach((t, i) => t.pos.set((i - 2) * 20, 0, 130));
 }
 
-// --- MODELS (Optimized with LOD) ---
+// --- OPTIMIZED MODELS ---
 function createFullCharacter(jerseyCol, pantsCol, isPlayer = false) {
     const group = new THREE.Group();
     const charGroup = new THREE.Group();
     
-    // Performance: Player gets high segments (24), Bots get low (10)
-    const segs = isPlayer ? 24 : 10;
+    // Performance: Higher segments for player (24), lower for bots (12)
+    const segments = isPlayer ? 24 : 12;
     
+    // Performance: Standard materials are much faster than Physical materials
     const jerseyMat = new THREE.MeshStandardMaterial({ color: jerseyCol, roughness: 0.5 });
     const pantsMat = new THREE.MeshStandardMaterial({ color: pantsCol, roughness: 0.8 });
-    const skinMat = new THREE.MeshStandardMaterial({ color: 0x8d5524, roughness: 0.9 });
     
-    // Performance: Only player uses high-cost Physical Material for the visor
+    // Visor: Use Physical (glass-like) only for the player
     const visorMat = isPlayer ? 
         new THREE.MeshPhysicalMaterial({ color: 0x000000, metalness: 1, roughness: 0, transparent: true, opacity: 0.8 }) :
-        new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.5 });
+        new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.8, roughness: 0.2 });
 
-    const chest = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.2, 2.8, segs), jerseyMat);
+    const chest = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.2, 2.8, segments), jerseyMat);
     chest.position.y = 1.4; chest.scale.set(1.15, 1, 0.75); 
     charGroup.add(chest);
 
-    const padGeom = new THREE.SphereGeometry(1, segs, segs);
+    const padGeom = new THREE.SphereGeometry(1, segments, segments);
     const lPad = new THREE.Mesh(padGeom, jerseyMat);
     lPad.position.set(1.5, 2.5, 0); lPad.scale.set(1.3, 0.65, 1.2); lPad.rotation.z = -0.4;
-    const rPad = lPad.clone(); rPad.position.x = -1.4; rPad.rotation.z = 0.4;
+    const rPad = lPad.clone(); rPad.position.x = -1.5; rPad.rotation.z = 0.4;
     charGroup.add(lPad, rPad);
 
-    const helm = new THREE.Mesh(new THREE.SphereGeometry(1.1, segs, segs), jerseyMat);
+    const helm = new THREE.Mesh(new THREE.SphereGeometry(1.1, segments, segments), jerseyMat);
     helm.position.y = 3.5;
-    const visor = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.25, 8, segs, Math.PI), visorMat);
+    const visor = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.28, 16, segments, Math.PI), visorMat);
     visor.position.set(0, 3.4, -0.6); visor.scale.set(1.2, 0.65, 1);
     charGroup.add(helm, visor);
 
     const createLeg = (side) => {
         const legPivot = new THREE.Group();
-        const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.55, 2, segs), pantsMat);
-        const calf = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.35, 1.8, segs), pantsMat);
+        const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.55, 2, segments), pantsMat);
+        const calf = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.35, 1.8, segments), pantsMat);
         const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 1.8), new THREE.MeshStandardMaterial({color: 0x111111}));
         thigh.position.y = -1.0; calf.position.y = -2.8; shoe.position.set(0, -3.7, -0.4);
         legPivot.add(thigh, calf, shoe);
@@ -109,14 +109,9 @@ function createFullCharacter(jerseyCol, pantsCol, isPlayer = false) {
     const lLeg = createLeg(1); const rLeg = createLeg(-1);
     charGroup.position.y = 2.7;
     group.add(lLeg, rLeg, charGroup);
-    
-    // Performance: Only the main player casts and receives complex shadows
-    group.traverse(child => {
-        if (child.isMesh) {
-            child.castShadow = isPlayer;
-            child.receiveShadow = isPlayer;
-        }
-    });
+
+    // Optimization: Only player casts shadows
+    group.traverse(child => { if (child.isMesh) child.castShadow = isPlayer; });
 
     return { group, lLeg, rLeg };
 }
@@ -124,10 +119,10 @@ function createFullCharacter(jerseyCol, pantsCol, isPlayer = false) {
 function createEliteBall() {
     const ball = new THREE.Group();
     const leather = new THREE.MeshStandardMaterial({ color: 0x4d2613, roughness: 0.7 });
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.55, 32, 32), leather);
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 16), leather);
     body.scale.set(1, 0.8, 1.8);
     const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    const r1 = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.04, 8, 32), ringMat);
+    const r1 = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.04, 8, 16), ringMat);
     r1.position.z = 0.6;
     const r2 = r1.clone(); r2.position.z = -0.6;
     const laces = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.8), ringMat);
@@ -141,7 +136,7 @@ function createGrassTexture(c1, c2) {
     canvas.width = 512; canvas.height = 512;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = c1; ctx.fillRect(0, 0, 512, 512);
-    for (let i = 0; i < 15000; i++) {
+    for (let i = 0; i < 10000; i++) {
         ctx.fillStyle = Math.random() > 0.5 ? c2 : 'rgba(0,0,0,0.1)';
         ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 4);
     }
@@ -159,22 +154,22 @@ function init() {
     camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 3000);
     renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
     
-    // Performance: Cap pixel ratio to 2 for 4K/Retina displays
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Performance: Cap resolution to 2K (1.5 pixel ratio)
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.body.appendChild(renderer.domElement);
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-    const hemiLight = new THREE.HemisphereLight(0x60a3bc, 0x2d5a27, 0.6);
+    const hemiLight = new THREE.HemisphereLight(0x60a3bc, 0x2d5a27, 0.7);
     scene.add(hemiLight);
 
     const sun = new THREE.DirectionalLight(0xffffff, 1.8);
     sun.position.set(50, 200, 50);
     sun.castShadow = true;
     
-    // Optimization: Dropped shadow map size from 4K to 1024 for performance
+    // 2K Optimization: 1024 is plenty for sharp shadows at 2K resolution
     sun.shadow.mapSize.width = 1024;
     sun.shadow.mapSize.height = 1024;
     sun.shadow.camera.left = -200;
@@ -193,40 +188,37 @@ function init() {
         scene.add(strip);
     }
 
-    // --- PLAYER SETUP (High Detail) ---
+    // PLAYER SETUP
     const playerModel = createFullCharacter(0xffffff, 0xffffff, true);
     player = playerModel.group;
     leftLeg = playerModel.lLeg;
     rightLeg = playerModel.rLeg;
     
-    // Manual setup for arms to maintain the player's unique torso hierarchy
-    const matWhite = new THREE.MeshPhysicalMaterial({ color: 0xffffff });
+    const matWhite = new THREE.MeshStandardMaterial({ color: 0xffffff });
     const createArm = (side) => {
         const p = new THREE.Group();
-        const u = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.3, 1.2, 24), matWhite);
+        const u = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.3, 1.2, 12), matWhite);
         u.position.y = -0.6; p.add(u);
         p.position.set(side * 1.3, 1.8, 0); return p;
     };
     leftArm = createArm(1); rightArm = createArm(-1);
-    
     torsoGroup = player.children[2];
     torsoGroup.add(leftArm, rightArm);
-
+    
     player.visible = false;
     scene.add(player);
 
     // GOAL
     const matGold = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.8, roughness: 0.2 });
     const goal = new THREE.Group();
-    const p1 = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 16), matGold); p1.position.y = 7.5;
-    const p2 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 18, 16), matGold); p2.rotation.z = Math.PI / 2; p2.position.y = 15;
-    const p3 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 20, 16), matGold); p3.position.set(-9, 25, 0);
-    const p4 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 20, 16), matGold); p4.position.set(9, 25, 0);
+    const p1 = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 12), matGold); p1.position.y = 7.5;
+    const p2 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 18, 12), matGold); p2.rotation.z = Math.PI / 2; p2.position.y = 15;
+    const p3 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 20, 12), matGold); p3.position.set(-9, 25, 0);
+    const p4 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 20, 12), matGold); p4.position.set(9, 25, 0);
     goal.traverse(m => { if(m.isMesh) m.castShadow = true; });
     goal.add(p1, p2, p3, p4); goal.position.z = -480;
     scene.add(goal);
 
-    // BOTS (Optimized through the Bot class)
     for (let i = 0; i < 5; i++) teammates.push(new Bot((i - 2) * 20, 130, 0xffffff, true));
     for (let i = 0; i < 12; i++) enemies.push(new Bot((Math.random() - 0.5) * 150, -100 - i * 60, 0xbb0000, false));
 
