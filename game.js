@@ -9,11 +9,10 @@ let isKicking = false, kickProgress = 0;
 
 let leftLeg, rightLeg, leftArm, rightArm, torsoGroup;
 
-// --- BOT CLASS ---
+// --- BOT CLASS (For both Teams) ---
 class Bot {
     constructor(x, z, color, isTeammate) {
-        // Optimization: Bots use 12 segments (standard for 2K) instead of 32
-        const char = createFullCharacter(color, 0x002244, false);
+        const char = createFullCharacter(color, 0x002244);
         this.group = char.group;
         this.lLeg = char.lLeg;
         this.rLeg = char.rLeg;
@@ -62,67 +61,45 @@ function resetPlay(text) {
     teammates.forEach((t, i) => t.pos.set((i - 2) * 20, 0, 130));
 }
 
-// --- OPTIMIZED MODELS ---
-function createFullCharacter(jerseyCol, pantsCol, isPlayer = false) {
+// --- MODELS ---
+function createFullCharacter(pCol, sCol) {
     const group = new THREE.Group();
     const charGroup = new THREE.Group();
-    
-    // Performance: Higher segments for player (24), lower for bots (12)
-    const segments = isPlayer ? 24 : 12;
-    
-    // Performance: Standard materials are much faster than Physical materials
-    const jerseyMat = new THREE.MeshStandardMaterial({ color: jerseyCol, roughness: 0.5 });
-    const pantsMat = new THREE.MeshStandardMaterial({ color: pantsCol, roughness: 0.8 });
-    
-    // Visor: Use Physical (glass-like) only for the player
-    const visorMat = isPlayer ? 
-        new THREE.MeshPhysicalMaterial({ color: 0x000000, metalness: 1, roughness: 0, transparent: true, opacity: 0.8 }) :
-        new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.8, roughness: 0.2 });
+    const matP = new THREE.MeshStandardMaterial({ color: pCol });
+    const matChrome = new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.8 });
 
-    const chest = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.2, 2.8, segments), jerseyMat);
-    chest.position.y = 1.4; chest.scale.set(1.15, 1, 0.75); 
-    charGroup.add(chest);
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 0.9, 2.2, 12), matP);
+    torso.position.y = 1.1; torso.scale.set(1.1, 1, 0.7);
+    charGroup.add(torso);
 
-    const padGeom = new THREE.SphereGeometry(1, segments, segments);
-    const lPad = new THREE.Mesh(padGeom, jerseyMat);
-    lPad.position.set(1.5, 2.5, 0); lPad.scale.set(1.3, 0.65, 1.2); lPad.rotation.z = -0.4;
-    const rPad = lPad.clone(); rPad.position.x = -1.5; rPad.rotation.z = 0.4;
-    charGroup.add(lPad, rPad);
+    const helm = new THREE.Mesh(new THREE.SphereGeometry(0.85, 16, 16), matP);
+    helm.position.y = 2.8;
+    const mask = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.05, 8, 16, Math.PI), matChrome);
+    mask.position.set(0, 2.5, -0.55);
+    charGroup.add(helm, mask);
 
-    const helm = new THREE.Mesh(new THREE.SphereGeometry(1.1, segments, segments), jerseyMat);
-    helm.position.y = 3.5;
-    const visor = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.28, 16, segments, Math.PI), visorMat);
-    visor.position.set(0, 3.4, -0.6); visor.scale.set(1.2, 0.65, 1);
-    charGroup.add(helm, visor);
-
-    const createLeg = (side) => {
-        const legPivot = new THREE.Group();
-        const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.55, 2, segments), pantsMat);
-        const calf = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.35, 1.8, segments), pantsMat);
-        const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 1.8), new THREE.MeshStandardMaterial({color: 0x111111}));
-        thigh.position.y = -1.0; calf.position.y = -2.8; shoe.position.set(0, -3.7, -0.4);
-        legPivot.add(thigh, calf, shoe);
-        legPivot.position.set(side * 0.8, 2.4, 0);
-        return legPivot;
+    const legPivot = (side) => {
+        const p = new THREE.Group();
+        const l = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.3, 3), matP);
+        l.position.y = -1.5; p.add(l);
+        p.position.set(side * 0.6, 2.4, 0);
+        return p;
     };
-    
-    const lLeg = createLeg(1); const rLeg = createLeg(-1);
+    const lLeg = legPivot(1);
+    const rLeg = legPivot(-1);
+
     charGroup.position.y = 2.7;
     group.add(lLeg, rLeg, charGroup);
-
-    // Optimization: Only player casts shadows
-    group.traverse(child => { if (child.isMesh) child.castShadow = isPlayer; });
-
     return { group, lLeg, rLeg };
 }
 
 function createEliteBall() {
     const ball = new THREE.Group();
     const leather = new THREE.MeshStandardMaterial({ color: 0x4d2613, roughness: 0.7 });
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.55, 16, 16), leather);
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.55, 32, 32), leather);
     body.scale.set(1, 0.8, 1.8);
     const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    const r1 = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.04, 8, 16), ringMat);
+    const r1 = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.04, 8, 32), ringMat);
     r1.position.z = 0.6;
     const r2 = r1.clone(); r2.position.z = -0.6;
     const laces = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.8), ringMat);
@@ -136,7 +113,7 @@ function createGrassTexture(c1, c2) {
     canvas.width = 512; canvas.height = 512;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = c1; ctx.fillRect(0, 0, 512, 512);
-    for (let i = 0; i < 10000; i++) {
+    for (let i = 0; i < 15000; i++) {
         ctx.fillStyle = Math.random() > 0.5 ? c2 : 'rgba(0,0,0,0.1)';
         ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 4);
     }
@@ -152,30 +129,15 @@ function init() {
     scene.fog = new THREE.FogExp2(0x60a3bc, 0.001);
 
     camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 3000);
-    renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-    
-    // Performance: Cap resolution to 2K (1.5 pixel ratio)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.body.appendChild(renderer.domElement);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-    const hemiLight = new THREE.HemisphereLight(0x60a3bc, 0x2d5a27, 0.7);
-    scene.add(hemiLight);
-
-    const sun = new THREE.DirectionalLight(0xffffff, 1.8);
-    sun.position.set(50, 200, 50);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+    sun.position.set(100, 200, 50);
     sun.castShadow = true;
-    
-    // 2K Optimization: 1024 is plenty for sharp shadows at 2K resolution
-    sun.shadow.mapSize.width = 1024;
-    sun.shadow.mapSize.height = 1024;
-    sun.shadow.camera.left = -200;
-    sun.shadow.camera.right = 200;
-    sun.shadow.camera.top = 200;
-    sun.shadow.camera.bottom = -200;
     scene.add(sun);
 
     const grassL = createGrassTexture('#2d5a27', '#3a6e33');
@@ -189,33 +151,51 @@ function init() {
     }
 
     // PLAYER SETUP
-    const playerModel = createFullCharacter(0xffffff, 0xffffff, true);
-    player = playerModel.group;
-    leftLeg = playerModel.lLeg;
-    rightLeg = playerModel.rLeg;
-    
-    const matWhite = new THREE.MeshStandardMaterial({ color: 0xffffff });
+    player = new THREE.Group();
+    torsoGroup = new THREE.Group();
+    const matWhite = new THREE.MeshPhysicalMaterial({ color: 0xffffff });
+
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 0.9, 2.2, 12), matWhite);
+    torso.position.y = 1.1; torso.scale.set(1.1, 1, 0.7);
+    torsoGroup.add(torso);
+
     const createArm = (side) => {
         const p = new THREE.Group();
-        const u = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.3, 1.2, 12), matWhite);
+        const u = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.3, 1.2), matWhite);
         u.position.y = -0.6; p.add(u);
         p.position.set(side * 1.3, 1.8, 0); return p;
     };
     leftArm = createArm(1); rightArm = createArm(-1);
-    torsoGroup = player.children[2];
     torsoGroup.add(leftArm, rightArm);
-    
+
+    const createLeg = (side) => {
+        const p = new THREE.Group();
+        const t = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.35, 3.2), matWhite);
+        t.position.y = -1.6; p.add(t);
+        p.position.set(side * 0.5, 2.4, 0); return p;
+    };
+    leftLeg = createLeg(-1); rightLeg = createLeg(1);
+
+    const helm = new THREE.Mesh(new THREE.SphereGeometry(0.85, 32, 32), matWhite);
+    helm.position.y = 2.8;
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.8, 1.8), new THREE.MeshStandardMaterial({ color: 0xfb4f14 }));
+    stripe.position.y = 2.8;
+    const mask = new THREE.Mesh(new THREE.TorusGeometry(0.48, 0.05, 12, 24, Math.PI), new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 1 }));
+    mask.position.set(0, 2.5, -0.55);
+    torsoGroup.add(helm, stripe, mask);
+
+    torsoGroup.position.y = 2.7;
+    player.add(leftLeg, rightLeg, torsoGroup);
     player.visible = false;
     scene.add(player);
 
     // GOAL
-    const matGold = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.8, roughness: 0.2 });
+    const matGold = new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.6 });
     const goal = new THREE.Group();
-    const p1 = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15, 12), matGold); p1.position.y = 7.5;
-    const p2 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 18, 12), matGold); p2.rotation.z = Math.PI / 2; p2.position.y = 15;
-    const p3 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 20, 12), matGold); p3.position.set(-9, 25, 0);
-    const p4 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 20, 12), matGold); p4.position.set(9, 25, 0);
-    goal.traverse(m => { if(m.isMesh) m.castShadow = true; });
+    const p1 = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 15), matGold); p1.position.y = 7.5;
+    const p2 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 18), matGold); p2.rotation.z = Math.PI / 2; p2.position.y = 15;
+    const p3 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 20), matGold); p3.position.set(-9, 25, 0);
+    const p4 = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 20), matGold); p4.position.set(9, 25, 0);
     goal.add(p1, p2, p3, p4); goal.position.z = -480;
     scene.add(goal);
 
