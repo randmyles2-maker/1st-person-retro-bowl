@@ -62,102 +62,71 @@ function resetPlay(text) {
 }
 
 // --- MODELS ---
-function createFullCharacter(jerseyCol, pantsCol) {
+function createFullCharacter(jerseyCol, pantsCol, isPlayer = false) {
     const group = new THREE.Group();
     const charGroup = new THREE.Group();
     
-    // PBR Materials (Physically Based Rendering)
-    const jerseyMat = new THREE.MeshStandardMaterial({ 
-        color: jerseyCol, roughness: 0.3, metalness: 0.1, 
-        flatShading: false // Smooths out the "blocky" look
-    });
+    // Use lower detail for bots to save FPS
+    const segments = isPlayer ? 24 : 12;
+    
+    // Materials: Only use the expensive Physical material for the player
+    const jerseyMat = new THREE.MeshStandardMaterial({ color: jerseyCol, roughness: 0.5 });
     const pantsMat = new THREE.MeshStandardMaterial({ color: pantsCol, roughness: 0.8 });
-    const skinMat = new THREE.MeshStandardMaterial({ color: 0x8d5524, roughness: 0.9 }); // Athletic skin tone
-    const chromeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.1 });
-    const visorMat = new THREE.MeshPhysicalMaterial({ 
-        color: 0x000000, metalness: 1, roughness: 0, transparent: true, opacity: 0.85, transmission: 0.5 
-    });
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0x8d5524, roughness: 0.9 });
+    
+    // Visor: Physical for player, Standard for bots
+    const visorMat = isPlayer ? 
+        new THREE.MeshPhysicalMaterial({ color: 0x000000, metalness: 1, roughness: 0, transparent: true, opacity: 0.8 }) :
+        new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.8, roughness: 0.2 });
 
-    // --- THE TORSO (V-Taper Anatomy) ---
-    // Upper Chest/Jersey
-    const chest = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.2, 2.8, 24), jerseyMat);
+    // --- TORSO ---
+    const chest = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.2, 2.8, segments), jerseyMat);
     chest.position.y = 1.4;
     chest.scale.set(1.15, 1, 0.75); 
     charGroup.add(chest);
 
-    // Heavy Shoulder Pads (Slanted for aggressive posture)
-    const padGeom = new THREE.SphereGeometry(1, 24, 24);
+    // Shoulder Pads
+    const padGeom = new THREE.SphereGeometry(1, segments, segments);
     const lPad = new THREE.Mesh(padGeom, jerseyMat);
     lPad.position.set(1.5, 2.5, 0);
     lPad.scale.set(1.3, 0.65, 1.2);
     lPad.rotation.z = -0.4;
-    const rPad = lPad.clone(); rPad.position.x = -1.5; rPad.rotation.z = 0.4;
+    const rPad = lPad.clone(); rPad.position.x = -1.4; rPad.rotation.z = 0.4;
     charGroup.add(lPad, rPad);
 
-    // --- ARMS (Biceps + Forearms + Tape) ---
-    const createArm = (side) => {
-        const armGroup = new THREE.Group();
-        const bicep = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.45, 1.3, 16), jerseyMat);
-        const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.28, 1.4, 16), skinMat);
-        const tape = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.29, 0.6, 16), new THREE.MeshStandardMaterial({color: 0xffffff}));
-        
-        bicep.position.y = -0.6;
-        forearm.position.y = -1.8;
-        tape.position.y = -2.2; // Athlete wrist tape
-        
-        armGroup.add(bicep, forearm, tape);
-        armGroup.position.set(side * 1.65, 2.2, 0);
-        return armGroup;
-    };
-    
-    // Set globals for player animation
-    if (jerseyCol === 0xffffff) {
-        leftArm = createArm(1); rightArm = createArm(-1);
-        charGroup.add(leftArm, rightArm);
-    } else {
-        charGroup.add(createArm(1), createArm(-1));
-    }
-
-    // --- HELMET (Professional Speed-Flex Style) ---
-    const helm = new THREE.Mesh(new THREE.SphereGeometry(1.1, 32, 32), jerseyMat);
+    // --- HELMET ---
+    const helm = new THREE.Mesh(new THREE.SphereGeometry(1.1, segments, segments), jerseyMat);
     helm.position.y = 3.5;
-    helm.scale.set(0.9, 1, 1.15);
-    
-    // Tinted Chrome Visor
-    const visor = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.28, 16, 32, Math.PI), visorMat);
-    visor.position.set(0, 3.4, -0.6);
-    visor.scale.set(1.2, 0.65, 1);
-    
-    // Realistic Chrome Face Grill
-    const grill = new THREE.Mesh(new THREE.TorusGeometry(0.65, 0.06, 8, 32, Math.PI), chromeMat);
-    grill.position.set(0, 3.1, -0.5);
-    grill.rotation.x = 0.3;
-    charGroup.add(helm, visor, grill);
+    const visor = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.25, 8, segments, Math.PI), visorMat);
+    visor.position.set(0, 3.4, -0.6); visor.scale.set(1.2, 0.65, 1);
+    charGroup.add(helm, visor);
 
-    // --- LEGS (Thighs + Calves + Cleats) ---
+    // --- LEGS ---
     const createLeg = (side) => {
         const legPivot = new THREE.Group();
-        const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.55, 2, 16), pantsMat);
-        const calf = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.35, 1.8, 16), pantsMat);
-        const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 1.8), new THREE.MeshStandardMaterial({color: 0x111111, roughness: 0.2}));
-        
-        thigh.position.y = -1.0;
-        calf.position.y = -2.8;
-        shoe.position.set(0, -3.7, -0.4); // Protruding toe
-        
+        const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.55, 2, segments), pantsMat);
+        const calf = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.35, 1.8, segments), pantsMat);
+        const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 1.8), new THREE.MeshStandardMaterial({color: 0x111111}));
+        thigh.position.y = -1.0; calf.position.y = -2.8; shoe.position.set(0, -3.7, -0.4);
         legPivot.add(thigh, calf, shoe);
         legPivot.position.set(side * 0.8, 2.4, 0);
         return legPivot;
     };
     
-    const lLeg = createLeg(1);
-    const rLeg = createLeg(-1);
+    const lLeg = createLeg(1); const rLeg = createLeg(-1);
     charGroup.position.y = 2.7;
     group.add(lLeg, rLeg, charGroup);
     
+    // Performance: Only cast shadows for the player or nearby bots
+    group.traverse(child => {
+        if (child.isMesh) {
+            child.castShadow = isPlayer; 
+            child.receiveShadow = isPlayer;
+        }
+    });
+
     return { group, lLeg, rLeg };
 }
-
 function createEliteBall() {
     const ball = new THREE.Group();
     const leather = new THREE.MeshStandardMaterial({ color: 0x4d2613, roughness: 0.7 });
